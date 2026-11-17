@@ -34,6 +34,7 @@ import com.huanco.campusgps.viewmodel.MapaViewModel
 fun PantallaMapa(viewModel: MapaViewModel) {
     val context = LocalContext.current
     val estado by viewModel.estado.collectAsState()
+    val lugares by viewModel.lugares.collectAsState()
     val solicitudPermisos = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permisos ->
@@ -68,6 +69,7 @@ fun PantallaMapa(viewModel: MapaViewModel) {
         ) {
             MapaUbicacion(
                 estado = estado,
+                lugares = lugares,
                 modifier = Modifier.fillMaxWidth().weight(1f)
             )
             Spacer(Modifier.height(8.dp))

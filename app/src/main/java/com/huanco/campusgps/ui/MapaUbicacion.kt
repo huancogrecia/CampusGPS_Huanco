@@ -1,5 +1,9 @@
 package com.huanco.campusgps.ui
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -18,8 +22,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.huanco.campusgps.model.LugarConDistancia
 import com.huanco.campusgps.model.UbicacionUi
 import org.maplibre.android.MapLibre
+import org.maplibre.android.annotations.IconFactory
+import org.maplibre.android.annotations.Marker
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -32,6 +39,7 @@ private const val ESTILO_MAPA = "https://tiles.openfreemap.org/styles/liberty"
 @Composable
 fun MapaUbicacion(
     estado: UbicacionUi,
+    lugares: List<LugarConDistancia>,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -42,6 +50,8 @@ fun MapaUbicacion(
     }
     var mapa by remember(mapView) { mutableStateOf<MapLibreMap?>(null) }
     var error by remember(mapView) { mutableStateOf(false) }
+    val marcadoresLugares = remember(mapa) { mutableMapOf<Int, Marker>() }
+    var marcadorUsuario by remember(mapa) { mutableStateOf<Marker?>(null) }
 
     DisposableEffect(mapView, lifecycle) {
         val fallo = MapView.OnDidFailLoadingMapListener { error = true }
@@ -74,14 +84,44 @@ fun MapaUbicacion(
         }
     }
 
+    LaunchedEffect(mapa, lugares) {
+        val actual = mapa ?: return@LaunchedEffect
+        val iconos = IconFactory.getInstance(context)
+        val azul = iconos.fromBitmap(colorearMarcadorAzul(iconos.defaultMarker().bitmap))
+        val lugaresPorId = lugares.associateBy { it.lugar.id }
+
+        (marcadoresLugares.keys - lugaresPorId.keys).forEach { id ->
+            marcadoresLugares.remove(id)?.let { actual.removeMarker(it) }
+        }
+        lugaresPorId.forEach { (id, dato) ->
+            val lugar = dato.lugar
+            val posicion = LatLng(lugar.latitud, lugar.longitud)
+            val anterior = marcadoresLugares[id]
+            if (anterior?.position != posicion || anterior.title != lugar.nombre ||
+                anterior.snippet != lugar.categoria
+            ) {
+                anterior?.let { actual.removeMarker(it) }
+                marcadoresLugares[id] = actual.addMarker(
+                    MarkerOptions()
+                        .position(posicion)
+                        .title(lugar.nombre)
+                        .snippet(lugar.categoria)
+                        .icon(azul)
+                )
+            }
+        }
+    }
+
     LaunchedEffect(mapa, estado) {
         val actual = mapa ?: return@LaunchedEffect
-        actual.markers.toList().forEach { actual.removeMarker(it) }
+        marcadorUsuario?.let { actual.removeMarker(it) }
+        marcadorUsuario = null
         if (estado is UbicacionUi.Lista) {
             val posicion = LatLng(estado.posicion.latitud, estado.posicion.longitud)
             val marcador = actual.addMarker(
                 MarkerOptions().position(posicion).title("Estás aquí")
             )
+            marcadorUsuario = marcador
             actual.animateCamera(CameraUpdateFactory.newLatLngZoom(posicion, 16.0))
             actual.selectMarker(marcador)
         }
@@ -95,4 +135,21 @@ fun MapaUbicacion(
             }
         }
     }
+}
+
+private fun colorearMarcadorAzul(original: Bitmap): Bitmap {
+    val resultado = Bitmap.createBitmap(original.width, original.height, Bitmap.Config.ARGB_8888)
+    resultado.density = original.density
+    val pintura = Paint().apply {
+        colorFilter = ColorMatrixColorFilter(
+            floatArrayOf(
+                0f, 0f, 1f, 0f, 0f,
+                0.45f, 0.55f, 0f, 0f, 0f,
+                1f, 0f, 0f, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+    }
+    Canvas(resultado).drawBitmap(original, 0f, 0f, pintura)
+    return resultado
 }
