@@ -4,7 +4,11 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Priority
@@ -17,6 +21,10 @@ class UbicacionRepositoryGoogle(
     private val context: Context,
     private val clienteUbicacion: FusedLocationProviderClient
 ) : UbicacionRepository {
+    override fun playServicesDisponible(): Boolean =
+        GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context) ==
+            ConnectionResult.SUCCESS
+
     @SuppressLint("MissingPermission")
     override suspend fun obtenerPosicion(): Result<Posicion> = try {
         val tienePermisoPreciso = ContextCompat.checkSelfPermission(
@@ -32,13 +40,18 @@ class UbicacionRepositoryGoogle(
             throw SecurityException("Se necesita permiso de ubicación")
         }
 
+        val locationManager = context.getSystemService(LocationManager::class.java)
+        if (!LocationManagerCompat.isLocationEnabled(locationManager)) {
+            throw UbicacionNoDisponibleException()
+        }
+
         val solicitud = CurrentLocationRequest.Builder()
             .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
             .build()
         val ubicacion = clienteUbicacion.getCurrentLocation(
             solicitud,
             CancellationTokenSource().token
-        ).await() ?: throw IllegalStateException("No se pudo obtener la ubicación")
+        ).await() ?: throw UbicacionNoDisponibleException()
 
         Result.success(Posicion(
             latitud = ubicacion.latitude,

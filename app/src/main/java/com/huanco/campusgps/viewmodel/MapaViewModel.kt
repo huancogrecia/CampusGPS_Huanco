@@ -5,9 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.huanco.campusgps.data.LugaresRepository
 import com.huanco.campusgps.data.UbicacionRepository
+import com.huanco.campusgps.data.UbicacionNoDisponibleException
 import com.huanco.campusgps.model.Lugar
 import com.huanco.campusgps.model.LugarConDistancia
 import com.huanco.campusgps.model.Posicion
+import com.huanco.campusgps.model.TipoError
 import com.huanco.campusgps.model.UbicacionUi
 import com.huanco.campusgps.util.distanciaMetros
 import com.huanco.campusgps.util.formatearDistancia
@@ -37,6 +39,14 @@ class MapaViewModel(
     val seleccionado: StateFlow<Int?> = _seleccionado.asStateFlow()
 
     fun buscar() {
+        if (_estado.value is UbicacionUi.Buscando) return
+        if (!ubicacionRepo.playServicesDisponible()) {
+            _estado.value = UbicacionUi.Error(
+                "Este dispositivo no tiene Google Play Services",
+                TipoError.SIN_PLAY_SERVICES
+            )
+            return
+        }
         _estado.value = UbicacionUi.Buscando
         viewModelScope.launch {
             ubicacionRepo.obtenerPosicion()
@@ -46,12 +56,21 @@ class MapaViewModel(
                     _estado.value = UbicacionUi.Lista(posicion)
                 }
                 .onFailure { error ->
-                    _estado.value = UbicacionUi.Error(
-                        when (error) {
-                            is SecurityException -> "Falta el permiso de ubicación"
-                            else -> error.message ?: "No se pudo obtener la ubicación"
+                    when (error) {
+                        is SecurityException -> permisoDenegado()
+                        is UbicacionNoDisponibleException -> {
+                            _estado.value = UbicacionUi.Error(
+                                "Activa el GPS e intenta de nuevo",
+                                TipoError.GPS_APAGADO
+                            )
                         }
-                    )
+                        else -> {
+                            _estado.value = UbicacionUi.Error(
+                                "No se pudo obtener la ubicación",
+                                TipoError.OTRO
+                            )
+                        }
+                    }
                 }
         }
     }
@@ -71,6 +90,9 @@ class MapaViewModel(
     }
 
     fun permisoDenegado() {
-        _estado.value = UbicacionUi.Error("Sin permiso de ubicación no puedo mostrar dónde estás")
+        _estado.value = UbicacionUi.Error(
+            "Sin permiso de ubicación no puedo mostrar dónde estás",
+            TipoError.SIN_PERMISO
+        )
     }
 }

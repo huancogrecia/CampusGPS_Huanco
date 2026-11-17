@@ -71,13 +71,15 @@ fun PantallaMapa(viewModel: MapaViewModel) {
                 .padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            MapaUbicacion(
-                estado = estado,
-                lugares = lugares,
-                seleccionado = seleccionado,
-                idMasCercano = masCercano?.id,
-                modifier = Modifier.fillMaxWidth().weight(1f)
-            )
+            if (estado !is UbicacionUi.Error) {
+                MapaUbicacion(
+                    estado = estado,
+                    lugares = lugares,
+                    seleccionado = seleccionado,
+                    idMasCercano = masCercano?.id,
+                    modifier = Modifier.fillMaxWidth().weight(1f)
+                )
+            }
             Spacer(Modifier.height(8.dp))
             Button(
                 enabled = estado !is UbicacionUi.Buscando,
@@ -105,18 +107,20 @@ fun PantallaMapa(viewModel: MapaViewModel) {
             ) {
                 Text("Obtener mi ubicación")
             }
-            OutlinedButton(
-                enabled = masCercano != null,
-                onClick = { masCercano?.let { viewModel.seleccionar(it.id) } }
-            ) {
-                Text("Ir al más cercano")
-            }
-            masCercano?.let { lugar ->
-                lugares.firstOrNull { it.lugar.id == lugar.id }?.metros?.let { metros ->
-                    Text(
-                        text = "Más cercano: ${lugar.nombre} (${formatearDistancia(metros)})",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+            if (estado !is UbicacionUi.Error) {
+                OutlinedButton(
+                    enabled = masCercano != null,
+                    onClick = { masCercano?.let { viewModel.seleccionar(it.id) } }
+                ) {
+                    Text("Ir al más cercano")
+                }
+                masCercano?.let { lugar ->
+                    lugares.firstOrNull { it.lugar.id == lugar.id }?.metros?.let { metros ->
+                        Text(
+                            text = "Más cercano: ${lugar.nombre} (${formatearDistancia(metros)})",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -128,18 +132,17 @@ fun PantallaMapa(viewModel: MapaViewModel) {
                     Text("Latitud: ${actual.posicion.latitud}")
                     Text("Longitud: ${actual.posicion.longitud}")
                 }
-                is UbicacionUi.Error -> Text(
-                    text = actual.mensaje,
-                    color = MaterialTheme.colorScheme.error
-                )
+                is UbicacionUi.Error -> MensajeError(actual, onReintentar = viewModel::buscar)
             }
             Spacer(Modifier.height(12.dp))
-            ListaLugares(
-                lugares = lugares,
-                seleccionado = seleccionado,
-                onClick = viewModel::seleccionar,
-                modifier = Modifier.fillMaxWidth().height(264.dp)
-            )
+            if (estado !is UbicacionUi.Error) {
+                ListaLugares(
+                    lugares = lugares,
+                    seleccionado = seleccionado,
+                    onClick = viewModel::seleccionar,
+                    modifier = Modifier.fillMaxWidth().height(264.dp)
+                )
+            }
         }
     }
 }
