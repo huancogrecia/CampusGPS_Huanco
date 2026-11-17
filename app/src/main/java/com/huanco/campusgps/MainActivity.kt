@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.gms.location.LocationServices
 import com.huanco.campusgps.data.LugaresRepositoryLocal
+import com.huanco.campusgps.data.PreferenciasRepositoryImpl
 import com.huanco.campusgps.data.UbicacionRepositoryGoogle
 import com.huanco.campusgps.ui.PantallaMapa
 import com.huanco.campusgps.ui.theme.CampusGPSTheme
@@ -18,9 +19,10 @@ class MainActivity : ComponentActivity() {
         val clienteUbicacion = LocationServices.getFusedLocationProviderClient(this)
         val ubicacionRepository = UbicacionRepositoryGoogle(this, clienteUbicacion)
         val lugaresRepository = LugaresRepositoryLocal()
+        val preferenciasRepository = PreferenciasRepositoryImpl(applicationContext)
         ViewModelProvider(
             this,
-            CampusViewModelFactory(ubicacionRepository, lugaresRepository)
+            CampusViewModelFactory(ubicacionRepository, lugaresRepository, preferenciasRepository)
         )[MapaViewModel::class.java]
     }
 

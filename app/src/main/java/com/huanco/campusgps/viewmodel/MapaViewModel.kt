@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.huanco.campusgps.data.LugaresRepository
+import com.huanco.campusgps.data.PreferenciasRepository
 import com.huanco.campusgps.data.UbicacionRepository
 import com.huanco.campusgps.data.UbicacionNoDisponibleException
 import com.huanco.campusgps.model.Lugar
@@ -13,30 +14,78 @@ import com.huanco.campusgps.model.TipoError
 import com.huanco.campusgps.model.UbicacionUi
 import com.huanco.campusgps.util.distanciaMetros
 import com.huanco.campusgps.util.formatearDistancia
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class MapaViewModel(
     private val ubicacionRepo: UbicacionRepository,
-    lugaresRepo: LugaresRepository
+    lugaresRepo: LugaresRepository,
+    private val preferenciasRepo: PreferenciasRepository
 ) : ViewModel() {
     private val _estado = MutableStateFlow<UbicacionUi>(UbicacionUi.Inicial)
     val estado: StateFlow<UbicacionUi> = _estado.asStateFlow()
+
     private val lugaresCampus = lugaresRepo.obtenerLugares()
-    private val _lugares = MutableStateFlow(
+
+    private val _lugaresConDistancia = MutableStateFlow(
         lugaresCampus.map { LugarConDistancia(it, null) }
     )
-    val lugares: StateFlow<List<LugarConDistancia>> = _lugares.asStateFlow()
+
+    private val _categoriaSeleccionada = MutableStateFlow<String?>(null)
+    val categoriaSeleccionada: StateFlow<String?> = _categoriaSeleccionada.asStateFlow()
+
+    val lugares: StateFlow<List<LugarConDistancia>> = combine(
+        _lugaresConDistancia,
+        _categoriaSeleccionada
+    ) { lista, categoria ->
+        if (categoria.isNullOrBlank()) {
+            lista
+        } else {
+            lista.filter { it.lugar.categoria.equals(categoria, ignoreCase = true) }
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = lugaresCampus.map { LugarConDistancia(it, null) }
+    )
+
     val masCercano: StateFlow<Lugar?> = lugares
         .map { lista -> lista.firstOrNull { it.metros != null }?.lugar }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
     private val _seleccionado = MutableStateFlow<Int?>(null)
     val seleccionado: StateFlow<Int?> = _seleccionado.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            try {
+                val ultimoId = preferenciasRepo.ultimoLugarId.first()
+                if (ultimoId != null && lugaresCampus.any { it.id == ultimoId }) {
+                    _seleccionado.value = ultimoId
+                }
+            } catch (cancelacion: CancellationException) {
+                throw cancelacion
+            } catch (e: Exception) {
+                Log.e("CampusGPS", "Error al recuperar último lugar", e)
+            }
+        }
+    }
+
+    fun seleccionarCategoria(categoria: String?) {
+        _categoriaSeleccionada.value = categoria
+    }
 
     fun buscar() {
         if (_estado.value is UbicacionUi.Buscando) return
@@ -52,7 +101,6 @@ class MapaViewModel(
             ubicacionRepo.obtenerPosicion()
                 .onSuccess { posicion ->
                     actualizarDistancias(posicion)
-                    seleccionar(null)
                     _estado.value = UbicacionUi.Lista(posicion)
                 }
                 .onFailure { error ->
@@ -79,7 +127,7 @@ class MapaViewModel(
         val ordenados = lugaresCampus
             .map { lugar -> LugarConDistancia(lugar, distanciaMetros(pos, lugar)) }
             .sortedBy { it.metros }
-        _lugares.value = ordenados
+        _lugaresConDistancia.value = ordenados
         Log.d("CampusGPS", ordenados.joinToString(" | ") { dato ->
             "${dato.lugar.nombre}: ${formatearDistancia(checkNotNull(dato.metros))}"
         })
@@ -87,6 +135,15 @@ class MapaViewModel(
 
     fun seleccionar(id: Int?) {
         _seleccionado.value = id
+        viewModelScope.launch {
+            try {
+                preferenciasRepo.guardarUltimoLugar(id)
+            } catch (cancelacion: CancellationException) {
+                throw cancelacion
+            } catch (e: Exception) {
+                Log.e("CampusGPS", "Error al guardar último lugar", e)
+            }
+        }
     }
 
     fun permisoDenegado() {
