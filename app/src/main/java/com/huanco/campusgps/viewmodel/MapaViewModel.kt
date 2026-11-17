@@ -35,6 +35,7 @@ class MapaViewModel(
             ubicacionRepo.obtenerPosicion()
                 .onSuccess { posicion ->
                     actualizarDistancias(posicion)
+                    seleccionar(null)
                     _estado.value = UbicacionUi.Lista(posicion)
                 }
                 .onFailure { error ->
@@ -56,6 +57,10 @@ class MapaViewModel(
         Log.d("CampusGPS", ordenados.joinToString(" | ") { dato ->
             "${dato.lugar.nombre}: ${formatearDistancia(checkNotNull(dato.metros))}"
         })
+    }
+
+    fun seleccionar(id: Int?) {
+        _seleccionado.value = id
     }
 
     fun permisoDenegado() {

@@ -40,6 +40,7 @@ private const val ESTILO_MAPA = "https://tiles.openfreemap.org/styles/liberty"
 fun MapaUbicacion(
     estado: UbicacionUi,
     lugares: List<LugarConDistancia>,
+    seleccionado: Int?,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -122,9 +123,18 @@ fun MapaUbicacion(
                 MarkerOptions().position(posicion).title("Estás aquí")
             )
             marcadorUsuario = marcador
-            actual.animateCamera(CameraUpdateFactory.newLatLngZoom(posicion, 16.0))
-            actual.selectMarker(marcador)
+            if (seleccionado == null) {
+                actual.animateCamera(CameraUpdateFactory.newLatLngZoom(posicion, 16.0))
+                actual.selectMarker(marcador)
+            }
         }
+    }
+
+    LaunchedEffect(mapa, seleccionado) {
+        val actual = mapa ?: return@LaunchedEffect
+        val marcador = marcadoresLugares[seleccionado] ?: return@LaunchedEffect
+        actual.animateCamera(CameraUpdateFactory.newLatLngZoom(marcador.position, 17.0))
+        actual.selectMarker(marcador)
     }
 
     Box(modifier) {
