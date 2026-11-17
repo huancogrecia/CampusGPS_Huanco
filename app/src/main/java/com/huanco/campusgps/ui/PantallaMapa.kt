@@ -4,16 +4,20 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -42,17 +46,31 @@ fun PantallaMapa(viewModel: MapaViewModel) {
         }
     }
 
-    Scaffold { padding ->
+    Scaffold(
+        topBar = {
+            Surface(
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Text(
+                    text = "CampusGPS",
+                    modifier = Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).padding(16.dp),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
+                .padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("CampusGPS", style = MaterialTheme.typography.headlineLarge)
-            Spacer(Modifier.height(24.dp))
+            MapaUbicacion(
+                estado = estado,
+                modifier = Modifier.fillMaxWidth().weight(1f)
+            )
+            Spacer(Modifier.height(8.dp))
             Button(
                 enabled = estado !is UbicacionUi.Buscando,
                 onClick = {
@@ -79,7 +97,7 @@ fun PantallaMapa(viewModel: MapaViewModel) {
             ) {
                 Text("Obtener mi ubicación")
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(8.dp))
 
             when (val actual = estado) {
                 UbicacionUi.Inicial -> Text("Presiona el botón para consultar tu ubicación")
@@ -93,6 +111,7 @@ fun PantallaMapa(viewModel: MapaViewModel) {
                     color = MaterialTheme.colorScheme.error
                 )
             }
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
