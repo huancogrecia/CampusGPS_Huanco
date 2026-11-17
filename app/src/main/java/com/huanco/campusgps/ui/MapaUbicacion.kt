@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,7 +34,8 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 
-private const val ESTILO_MAPA = "https://tiles.openfreemap.org/styles/liberty"
+private const val ESTILO_MAPA_CLARO = "https://tiles.openfreemap.org/styles/liberty"
+private const val ESTILO_MAPA_OSCURO = "https://tiles.openfreemap.org/styles/dark"
 
 @Suppress("DEPRECATION")
 @Composable
@@ -42,6 +44,7 @@ fun MapaUbicacion(
     lugares: List<LugarConDistancia>,
     seleccionado: Int?,
     idMasCercano: Int?,
+    isDarkTheme: Boolean,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -52,6 +55,7 @@ fun MapaUbicacion(
     }
     var mapa by remember(mapView) { mutableStateOf<MapLibreMap?>(null) }
     var error by remember(mapView) { mutableStateOf(false) }
+    val temaOscuroActual by rememberUpdatedState(isDarkTheme)
     val marcadoresLugares = remember(mapa) { mutableMapOf<Int, Marker>() }
     var marcadorUsuario by remember(mapa) { mutableStateOf<Marker?>(null) }
     val iconosLugares = remember(mapa) {
@@ -65,7 +69,16 @@ fun MapaUbicacion(
     }
 
     DisposableEffect(mapView, lifecycle) {
-        val fallo = MapView.OnDidFailLoadingMapListener { error = true }
+        val fallo = MapView.OnDidFailLoadingMapListener {
+            if (temaOscuroActual) {
+                // Fallback seguro al estilo claro si falla el estilo oscuro
+                mapView.getMapAsync { disponible ->
+                    disponible.setStyle(ESTILO_MAPA_CLARO) { error = false }
+                }
+            } else {
+                error = true
+            }
+        }
         mapView.addOnDidFailLoadingMapListener(fallo)
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -81,7 +94,8 @@ fun MapaUbicacion(
             disponible.uiSettings.isLogoEnabled = false
             disponible.uiSettings.isAttributionEnabled = false
             disponible.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(-12.0464, -77.0428), 12.0))
-            disponible.setStyle(ESTILO_MAPA) {
+            val estiloInicial = if (isDarkTheme) ESTILO_MAPA_OSCURO else ESTILO_MAPA_CLARO
+            disponible.setStyle(estiloInicial) {
                 error = false
                 mapa = disponible
             }
@@ -92,6 +106,14 @@ fun MapaUbicacion(
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) mapView.onPause()
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) mapView.onStop()
             mapView.onDestroy()
+        }
+    }
+
+    LaunchedEffect(mapa, isDarkTheme) {
+        val actual = mapa ?: return@LaunchedEffect
+        val estilo = if (isDarkTheme) ESTILO_MAPA_OSCURO else ESTILO_MAPA_CLARO
+        actual.setStyle(estilo) {
+            error = false
         }
     }
 

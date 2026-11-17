@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,6 +46,7 @@ fun PantallaMapa(viewModel: MapaViewModel) {
     val seleccionado by viewModel.seleccionado.collectAsState()
     val masCercano by viewModel.masCercano.collectAsState()
     val categoriaSeleccionada by viewModel.categoriaSeleccionada.collectAsState()
+    val isDarkTheme = isSystemInDarkTheme()
     val categorias = listOf(null, "Estudio", "Comida", "Eventos", "Servicios")
 
     val solicitudPermisos = rememberLauncherForActivityResult(
@@ -101,6 +103,7 @@ fun PantallaMapa(viewModel: MapaViewModel) {
                     lugares = lugares,
                     seleccionado = seleccionado,
                     idMasCercano = masCercano?.id,
+                    isDarkTheme = isDarkTheme,
                     modifier = Modifier.fillMaxWidth().weight(1f)
                 )
             }
