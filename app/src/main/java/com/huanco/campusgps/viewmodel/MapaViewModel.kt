@@ -1,11 +1,15 @@
 package com.huanco.campusgps.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.huanco.campusgps.data.LugaresRepository
 import com.huanco.campusgps.data.UbicacionRepository
 import com.huanco.campusgps.model.LugarConDistancia
+import com.huanco.campusgps.model.Posicion
 import com.huanco.campusgps.model.UbicacionUi
+import com.huanco.campusgps.util.distanciaMetros
+import com.huanco.campusgps.util.formatearDistancia
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,8 +21,9 @@ class MapaViewModel(
 ) : ViewModel() {
     private val _estado = MutableStateFlow<UbicacionUi>(UbicacionUi.Inicial)
     val estado: StateFlow<UbicacionUi> = _estado.asStateFlow()
+    private val lugaresCampus = lugaresRepo.obtenerLugares()
     private val _lugares = MutableStateFlow(
-        lugaresRepo.obtenerLugares().map { LugarConDistancia(it, null) }
+        lugaresCampus.map { LugarConDistancia(it, null) }
     )
     val lugares: StateFlow<List<LugarConDistancia>> = _lugares.asStateFlow()
     private val _seleccionado = MutableStateFlow<Int?>(null)
@@ -29,6 +34,7 @@ class MapaViewModel(
         viewModelScope.launch {
             ubicacionRepo.obtenerPosicion()
                 .onSuccess { posicion ->
+                    actualizarDistancias(posicion)
                     _estado.value = UbicacionUi.Lista(posicion)
                 }
                 .onFailure { error ->
@@ -40,6 +46,16 @@ class MapaViewModel(
                     )
                 }
         }
+    }
+
+    private fun actualizarDistancias(pos: Posicion) {
+        val ordenados = lugaresCampus
+            .map { lugar -> LugarConDistancia(lugar, distanciaMetros(pos, lugar)) }
+            .sortedBy { it.metros }
+        _lugares.value = ordenados
+        Log.d("CampusGPS", ordenados.joinToString(" | ") { dato ->
+            "${dato.lugar.nombre}: ${formatearDistancia(checkNotNull(dato.metros))}"
+        })
     }
 
     fun permisoDenegado() {
