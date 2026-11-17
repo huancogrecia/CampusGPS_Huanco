@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.huanco.campusgps.model.UbicacionUi
+import com.huanco.campusgps.util.formatearDistancia
 import com.huanco.campusgps.viewmodel.MapaViewModel
 
 @Composable
@@ -36,6 +38,7 @@ fun PantallaMapa(viewModel: MapaViewModel) {
     val estado by viewModel.estado.collectAsState()
     val lugares by viewModel.lugares.collectAsState()
     val seleccionado by viewModel.seleccionado.collectAsState()
+    val masCercano by viewModel.masCercano.collectAsState()
     val solicitudPermisos = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permisos ->
@@ -72,6 +75,7 @@ fun PantallaMapa(viewModel: MapaViewModel) {
                 estado = estado,
                 lugares = lugares,
                 seleccionado = seleccionado,
+                idMasCercano = masCercano?.id,
                 modifier = Modifier.fillMaxWidth().weight(1f)
             )
             Spacer(Modifier.height(8.dp))
@@ -100,6 +104,20 @@ fun PantallaMapa(viewModel: MapaViewModel) {
                 }
             ) {
                 Text("Obtener mi ubicación")
+            }
+            OutlinedButton(
+                enabled = masCercano != null,
+                onClick = { masCercano?.let { viewModel.seleccionar(it.id) } }
+            ) {
+                Text("Ir al más cercano")
+            }
+            masCercano?.let { lugar ->
+                lugares.firstOrNull { it.lugar.id == lugar.id }?.metros?.let { metros ->
+                    Text(
+                        text = "Más cercano: ${lugar.nombre} (${formatearDistancia(metros)})",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
             Spacer(Modifier.height(8.dp))
 

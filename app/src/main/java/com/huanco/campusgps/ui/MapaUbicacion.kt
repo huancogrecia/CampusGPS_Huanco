@@ -41,6 +41,7 @@ fun MapaUbicacion(
     estado: UbicacionUi,
     lugares: List<LugarConDistancia>,
     seleccionado: Int?,
+    idMasCercano: Int?,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -53,6 +54,15 @@ fun MapaUbicacion(
     var error by remember(mapView) { mutableStateOf(false) }
     val marcadoresLugares = remember(mapa) { mutableMapOf<Int, Marker>() }
     var marcadorUsuario by remember(mapa) { mutableStateOf<Marker?>(null) }
+    val iconosLugares = remember(mapa) {
+        mapa?.let {
+            val fabrica = IconFactory.getInstance(context)
+            val original = fabrica.defaultMarker().bitmap
+            val azul = fabrica.fromBitmap(colorearMarcador(original, verde = false))
+            val verde = fabrica.fromBitmap(colorearMarcador(original, verde = true))
+            azul to verde
+        }
+    }
 
     DisposableEffect(mapView, lifecycle) {
         val fallo = MapView.OnDidFailLoadingMapListener { error = true }
@@ -85,10 +95,9 @@ fun MapaUbicacion(
         }
     }
 
-    LaunchedEffect(mapa, lugares) {
+    LaunchedEffect(mapa, lugares, idMasCercano) {
         val actual = mapa ?: return@LaunchedEffect
-        val iconos = IconFactory.getInstance(context)
-        val azul = iconos.fromBitmap(colorearMarcadorAzul(iconos.defaultMarker().bitmap))
+        val (azul, verde) = iconosLugares ?: return@LaunchedEffect
         val lugaresPorId = lugares.associateBy { it.lugar.id }
 
         (marcadoresLugares.keys - lugaresPorId.keys).forEach { id ->
@@ -97,9 +106,10 @@ fun MapaUbicacion(
         lugaresPorId.forEach { (id, dato) ->
             val lugar = dato.lugar
             val posicion = LatLng(lugar.latitud, lugar.longitud)
+            val icono = if (id == idMasCercano) verde else azul
             val anterior = marcadoresLugares[id]
             if (anterior?.position != posicion || anterior.title != lugar.nombre ||
-                anterior.snippet != lugar.categoria
+                anterior.snippet != lugar.categoria || anterior.icon != icono
             ) {
                 anterior?.let { actual.removeMarker(it) }
                 marcadoresLugares[id] = actual.addMarker(
@@ -107,7 +117,7 @@ fun MapaUbicacion(
                         .position(posicion)
                         .title(lugar.nombre)
                         .snippet(lugar.categoria)
-                        .icon(azul)
+                        .icon(icono)
                 )
             }
         }
@@ -147,15 +157,15 @@ fun MapaUbicacion(
     }
 }
 
-private fun colorearMarcadorAzul(original: Bitmap): Bitmap {
+private fun colorearMarcador(original: Bitmap, verde: Boolean): Bitmap {
     val resultado = Bitmap.createBitmap(original.width, original.height, Bitmap.Config.ARGB_8888)
     resultado.density = original.density
     val pintura = Paint().apply {
         colorFilter = ColorMatrixColorFilter(
             floatArrayOf(
                 0f, 0f, 1f, 0f, 0f,
-                0.45f, 0.55f, 0f, 0f, 0f,
-                1f, 0f, 0f, 0f, 0f,
+                if (verde) 1f else 0.45f, if (verde) 0f else 0.55f, 0f, 0f, 0f,
+                if (verde) 0f else 1f, if (verde) 1f else 0f, 0f, 0f, 0f,
                 0f, 0f, 0f, 1f, 0f
             )
         )
