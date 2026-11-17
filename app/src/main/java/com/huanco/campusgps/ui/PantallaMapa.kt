@@ -4,7 +4,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,8 +15,11 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -39,6 +44,9 @@ fun PantallaMapa(viewModel: MapaViewModel) {
     val lugares by viewModel.lugares.collectAsState()
     val seleccionado by viewModel.seleccionado.collectAsState()
     val masCercano by viewModel.masCercano.collectAsState()
+    val categoriaSeleccionada by viewModel.categoriaSeleccionada.collectAsState()
+    val categorias = listOf(null, "Estudio", "Comida", "Eventos", "Servicios")
+
     val solicitudPermisos = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permisos ->
@@ -71,6 +79,22 @@ fun PantallaMapa(viewModel: MapaViewModel) {
                 .padding(padding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Filtros por categoría
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(categorias, key = { it ?: "Todas" }) { cat ->
+                    val etiqueta = cat ?: "Todas"
+                    FilterChip(
+                        selected = categoriaSeleccionada == cat,
+                        onClick = { viewModel.seleccionarCategoria(cat) },
+                        label = { Text(etiqueta) }
+                    )
+                }
+            }
+
             if (estado !is UbicacionUi.Error) {
                 MapaUbicacion(
                     estado = estado,
